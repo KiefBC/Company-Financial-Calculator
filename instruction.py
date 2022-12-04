@@ -1,8 +1,9 @@
 import database
+from sqlalchemy import func
 
 EMPTY_LINE = ''
-COMPANY_NAME = '\nEnter company name: \n'
-COMPANY_NUMBER = '\nEnter company number: \n'
+COMPANY_NAME = 'Enter company name: '
+COMPANY_NUMBER = 'Enter company number: '
 
 
 def search_company():
@@ -17,7 +18,7 @@ def search_company():
         print(EMPTY_LINE)
         # Adding a counter to the company name to enumerate the list
         for count, c in enumerate(company):
-            print(f'{count} {c.ticker} - {c.name}')
+            print(f'{count} {c.name}')
         n_query = input(f'{COMPANY_NUMBER}')
         selected_company = company[int(n_query)]
         # Grabbing the financial data from the database
@@ -26,6 +27,7 @@ def search_company():
         # Calculating the financial ratios
         p_e = round(financial.market_price / financial.net_profit, 2)
         p_s = round(financial.market_price / financial.sales, 2)
+        p_b = round(financial.market_price / financial.assets, 2)
         if financial.net_debt is None or financial.ebitda is None:
             nd_ebitda = None
         else:
@@ -34,7 +36,7 @@ def search_company():
         roa = round(financial.net_profit / financial.assets, 2)
         l_a = round(financial.liabilities / financial.assets, 2)
         print(
-            f'({selected_company.ticker}) {selected_company.name}\nP/E = {p_e}\nP/S = {p_s}\nND/EBITDA = {nd_ebitda}\nROE = {roe}\nROA = {roa}\nL/A = {l_a}')
+            f'{selected_company.ticker} {selected_company.name}\nP/E = {p_e}\nP/S = {p_s}\nP/B = {p_b}\nND/EBITDA = {nd_ebitda}\nROE = {roe}\nROA = {roa}\nL/A = {l_a}')
     else:
         print('\nCompany not found!\n')
 
@@ -43,19 +45,36 @@ def list_all():
     """
     List all companies
     """
-    print("\nCOMPANY LIST\n")
-    companies = database.session.query(database.CompanyDatabase).all()
+    print("COMPANY LIST")
+    companies = database.session.query(database.CompanyDatabase).order_by(database.CompanyDatabase.ticker).all()
     for company in companies:
-        print(company.ticker, company.name)
+        print(company.ticker, company.name, company.sector)
 
-def top_10():
+
+def top_10(user_choice):
     """
     List the top 10 companies
     """
-    print("\nTOP 10\n")
-    companies = database.session.query(database.CompanyDatabase).limit(10).all()
-    for company in companies:
-        print(company.ticker, company.name)
+    match user_choice:
+        case '1':  # :List by ND/EBITDA
+            print('TICKER ND/EBITDA')
+            companies = database.session.query(database.FinancialDatabase).filter(
+                database.FinancialDatabase.ebitda != None).order_by((database.FinancialDatabase.net_debt / database.FinancialDatabase.ebitda).desc()).limit(10).all()
+            for company in companies:
+                top_ebitda = round(company.net_debt / company.ebitda, 2)
+                print(company.ticker, top_ebitda)
+        case '2':  # List by ROE
+            print('TICKER ROE')
+            companies = database.session.query(database.FinancialDatabase).filter(database.FinancialDatabase.equity != None).order_by((database.FinancialDatabase.net_profit / database.FinancialDatabase.equity).desc()).limit(10).all()
+            for company in companies:
+                top_roe = round(company.net_profit / company.equity, 2)
+                print(company.ticker, top_roe)
+        case '3':  # List by ROA
+            print('TICKER ROA')
+            companies = database.session.query(database.FinancialDatabase).order_by(func.round(database.FinancialDatabase.net_profit / database.FinancialDatabase.assets, 2).desc()).limit(10).all()
+            for company in companies:
+                top_roa = round(company.net_profit / company.assets, 2)
+                print(company.ticker, top_roa)
 
 
 def update_company():
@@ -70,7 +89,7 @@ def update_company():
         print(EMPTY_LINE)
         # Adding a counter to the company name to enumerate the list
         for count, c in enumerate(company):
-            print(f'{count} {c.ticker} - {c.name}')
+            print(f'{count} {c.name}')
         n_query = input(f'{COMPANY_NUMBER}')
         selected_company = company[int(n_query)]
         ebitda = float(input("Enter ebitda (in the format '987654321'):\n"))
@@ -88,9 +107,9 @@ def update_company():
         database.session.query(database.FinancialDatabase).filter(
             database.FinancialDatabase.ticker == selected_company.ticker).update(financial_dict)
         database.session.commit()
-        print("\nCompany updated successfully!")
+        print("Company updated successfully!")
     else:
-        print('\nCompany not found!')
+        print('Company not found!')
 
 
 def delete_company():
@@ -105,10 +124,10 @@ def delete_company():
         print(EMPTY_LINE)
         # Adding a counter to the company name to enumerate the list
         for count, c in enumerate(company):
-            print(f'{count} {c.ticker} - {c.name}')
+            print(f'{count} {c.name}')
         n_query = input(f'{COMPANY_NUMBER}')
         selected_company = company[int(n_query)]
-        # Grabbing the financial data from the database
+        # Grabbing the financial and company data from the database
         financial = database.session.query(database.FinancialDatabase).filter(
             database.FinancialDatabase.ticker == selected_company.ticker).first()
         database.session.delete(financial)
@@ -119,7 +138,7 @@ def delete_company():
         print('\nCompany not found!')
 
 
-def add_entry(table, data) -> None:
+def add_entry(table, data):
     """
     Add a new entry to the database
     """
@@ -155,7 +174,7 @@ def create_company():
                       'cash_equivalents': cash_equivalents, 'liabilities': liabilities}
     database.add_entry(database.CompanyDatabase, [company_dict])
     database.add_entry(database.FinancialDatabase, [financial_dict])
-    print("\nCompany created successfully!")
+    print("Company created successfully!")
 
 
 if __name__ == '__main__':

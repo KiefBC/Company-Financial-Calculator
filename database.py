@@ -1,5 +1,6 @@
 import csv
 from os.path import exists
+from instruction import add_entry
 
 from sqlalchemy import Column, String, create_engine, Float
 from sqlalchemy.ext.declarative import declarative_base
@@ -9,20 +10,6 @@ engine = create_engine('sqlite:///investor.db', echo=False)
 Session = sessionmaker(bind=engine)
 session = Session()
 Base = declarative_base()
-
-
-def add_entry(table, data) -> None:
-    """
-    Add a new entry to the database
-    """
-    for byte in data:
-        for k, v in byte.items():
-            if v == '':
-                byte[k] = None
-
-    for byte in data:
-        session.add(table(**byte))
-        session.commit()
 
 
 class CompanyDatabase(Base):
@@ -48,11 +35,10 @@ class FinancialDatabase(Base):
     liabilities = Column(Float)
 
 
-def main() -> None:
+def main():
     # Create the database
     db_name = 'investor.db'
     if exists(db_name):
-        print('Database already exists!')
         return  # Database is already made
 
     Base.metadata.create_all(engine)
